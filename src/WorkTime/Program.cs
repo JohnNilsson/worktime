@@ -110,7 +110,7 @@ namespace WorkTime
           yield return new Event
           {
             Type = (EventType)e.Id,
-            Time = e.TimeCreated.Value
+            Time = e.TimeCreated.Value.AddHours(-6)
           };
           e = reader.ReadEvent();
         }
