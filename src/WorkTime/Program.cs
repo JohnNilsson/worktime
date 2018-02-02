@@ -128,8 +128,8 @@ namespace WorkTime
 
     private static IEnumerable<Range> ToRanges(this IEnumerable<Event> events)
     {
-      var started = DateTime.MinValue;
-      foreach (var e in events.SkipWhile(_ => _.Type == EventType.Locked))
+      DateTime? started = null;
+      foreach (var e in events)
       {
         switch (e.Type)
         {
@@ -137,7 +137,8 @@ namespace WorkTime
             started = e.Time;
             break;
           case EventType.Locked:
-            yield return new Range {Start = started, End = e.Time};
+            yield return new Range {Start = started ?? e.Time.AddMinutes(-1), End = e.Time};
+            started = null;
             break;
           default:
             throw new NotSupportedException();
