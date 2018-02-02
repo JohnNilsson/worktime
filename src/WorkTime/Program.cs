@@ -38,19 +38,26 @@ namespace WorkTime
     {
       var from = DateTime.Today.AddDays(-40);
       var to = DateTime.Today.AddDays(1);
-
-      var ranges = QueryLockEvents(from, to).ToRanges().SplitByDate();
+      var dates = Enumerable.Range(0, (to - from).Days).Select(d => from.AddDays(d));
 
       const int blocksPerDay = 24 * 2;
       var ticksPerBlock = TimeSpan.FromDays(1).Ticks / blocksPerDay;
 
+
+
+      var workBlocks = QueryLockEvents(from, to)
+        .ToRanges()
+        .SplitByDate()
+        .GroupBy(r => r.Start.Date, r => r.ToDateHistogram(blocksPerDay), (date, bits) => (date:date, bits:Or(bits)))
+        .ToDictionary(g => g.date,g => g.bits);
+
+
       var q =
-        from range in ranges
-        group range.ToDateHistogram(blocksPerDay) by range.Start.Date into dateRanges
-        let date = dateRanges.Key
-        let dateBits = dateRanges.Aggregate((h1, h2) => h1.Or(h2))
-        let ascii = dateBits.Render()/*.Replace("*.*", "***")*/
-        let worktime = DateTime.MinValue.AddTicks(ascii.Count(c => c == '*') * ticksPerBlock)
+        from date in dates
+        let dateBits = workBlocks.ContainsKey(date) ? workBlocks[date] : new BitArray(blocksPerDay)
+        let workedBlocks = dateBits.Cast<bool>().Count(b=>b)
+        let worktime = DateTime.MinValue.AddTicks(workedBlocks * ticksPerBlock)
+        let ascii = dateBits.Render()
         select new { date, ascii, worktime }
         ;
 
@@ -176,6 +183,9 @@ namespace WorkTime
       return bits;
     }
 
+    private static BitArray Or(BitArray x, BitArray y) => x.Or(y);
+
+    private static BitArray Or(IEnumerable<BitArray> arrays) => arrays.Aggregate(Or);
 
 
     private static string Render(this BitArray histogram)
